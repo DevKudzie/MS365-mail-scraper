@@ -48,8 +48,22 @@ def access_emails_with_delegated_permissions(start_date, end_date, category_filt
 
     headers = {"Authorization": f"Bearer {access_token}"}
 
-    # Build the filter query
-    filter_query = f"receivedDateTime ge {start_date}T00:00:00Z and receivedDateTime le {end_date}T23:59:59Z"
+    # Ensure date format is correct (YYYY-MM-DD)
+    try:
+        # Parse and reformat dates to ensure they have proper formatting
+        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+        
+        formatted_start_date = start_date_obj.strftime("%Y-%m-%d")
+        formatted_end_date = end_date_obj.strftime("%Y-%m-%d")
+        
+        # Build the filter query with properly formatted dates
+        filter_query = f"receivedDateTime ge {formatted_start_date}T00:00:00Z and receivedDateTime le {formatted_end_date}T23:59:59Z"
+    except ValueError as e:
+        print(f"Error parsing dates: {e}")
+        print("Please ensure dates are in YYYY-MM-DD format.")
+        return [], None
+
     if category_filter:
         filter_query += f" and categories/any(c:c eq '{category_filter}')"
 
@@ -177,7 +191,13 @@ def process_emails(start_date, end_date, output_file="email_data.xlsx", batch_si
 
     if not emails:
         print("No emails found.")
-        return
+        # Return an empty summary dictionary instead of None
+        return {
+            "total_emails": 0,
+            "processed_emails": 0,
+            "with_attachments": 0,
+            "output_file": output_file
+        }
 
     print(f"Retrieved {len(emails)} emails. Processing...")
     
@@ -291,20 +311,32 @@ def main():
     
     args = parser.parse_args()
     
-    summary = process_emails(
-        start_date=args.start_date,
-        end_date=args.end_date,
-        output_file=args.output,
-        batch_size=args.batch_size,
-        category_filter=args.category,
-        limit=args.limit
-    )
+    try:
+        # Validate date formats
+        datetime.strptime(args.start_date, "%Y-%m-%d")
+        datetime.strptime(args.end_date, "%Y-%m-%d")
+        
+        summary = process_emails(
+            start_date=args.start_date,
+            end_date=args.end_date,
+            output_file=args.output,
+            batch_size=args.batch_size,
+            category_filter=args.category,
+            limit=args.limit
+        )
+        
+        print("\nSummary:")
+        print(f"Total emails retrieved: {summary['total_emails']}")
+        print(f"Emails processed: {summary['processed_emails']}")
+        print(f"Emails with attachments: {summary['with_attachments']}")
+        print(f"Output saved to: {summary['output_file']}")
     
-    print("\nSummary:")
-    print(f"Total emails retrieved: {summary['total_emails']}")
-    print(f"Emails processed: {summary['processed_emails']}")
-    print(f"Emails with attachments: {summary['with_attachments']}")
-    print(f"Output saved to: {summary['output_file']}")
+    except ValueError as e:
+        print(f"Error: {e}")
+        print("Please ensure dates are in YYYY-MM-DD format.")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
