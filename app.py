@@ -196,8 +196,8 @@ def extract_text_with_primary_ocr(file_path):
 
 # Function to extract text using the advanced GOT-OCR model
 def extract_text_with_got_ocr(file_path):
-    """Extract text using the GOT-OCR-2.0 model from HuggingFace"""
-    logger.info(f"Attempting advanced OCR with GOT-OCR-2.0 model on {file_path}")
+    """Extract text using the GOT-OCR2_0 model from HuggingFace"""
+    logger.info(f"Attempting advanced OCR with GOT-OCR2_0 model on {file_path}")
     try:
         # Initialize the model and processor
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -205,30 +205,71 @@ def extract_text_with_got_ocr(file_path):
         
         logger.info("Loading GOT-OCR model (this may take some time on first run)")
         # Use the correct model ID and parameters
+        tokenizer = AutoTokenizer.from_pretrained(
+            "stepfun-ai/GOT-OCR2_0", 
+            trust_remote_code=True,
+        )
+        
         model = AutoModel.from_pretrained(
             "stepfun-ai/GOT-OCR2_0", 
             trust_remote_code=True,
-            low_cpu_mem_usage=True
-        ).to(device)
-        
-        processor = AutoProcessor.from_pretrained(
-            "stepfun-ai/GOT-OCR2_0",
-            trust_remote_code=True
+            low_cpu_mem_usage=True,
+            device_map=device,
+            pad_token_id=tokenizer.eos_token_id
         )
         
-        # Load and process the image
-        logger.info("Processing image with GOT-OCR")
-        image = Image.open(file_path)
-        pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
+        # Check if the file is a PDF or an image
+        file_extension = os.path.splitext(file_path)[1].lower()
         
-        # Generate OCR results
-        logger.info("Generating OCR results")
-        generated_ids = model.generate(
-            pixel_values=pixel_values,
-            max_length=512,
-        )
-        text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-        logger.info(f"GOT-OCR extraction complete, yielded {len(text)} characters")
+        if file_extension == '.pdf':
+            logger.info(f"Processing PDF file with GOT-OCR: {file_path}")
+            # Use PyMuPDF to convert PDF to images
+            full_text = []
+            
+            # Open the PDF
+            pdf_document = fitz.open(file_path)
+            
+            # Process each page
+            for page_num in range(len(pdf_document)):
+                logger.info(f"Processing page {page_num+1}/{len(pdf_document)} of PDF")
+                page = pdf_document.load_page(page_num)
+                
+                # Convert page to an image
+                pix = page.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
+                
+                # Save the image to a temporary file
+                temp_img_path = f"temp_page_{page_num}.png"
+                pix.save(temp_img_path)
+                
+                # Process the image with GOT-OCR
+                try:
+                    # Process the image with GOT-OCR using the chat method as per documentation
+                    page_text = model.chat(tokenizer, temp_img_path, ocr_type='ocr')
+                    if page_text:
+                        full_text.append(page_text)
+                    logger.info(f"Extracted {len(page_text) if page_text else 0} characters from page {page_num+1}")
+                except Exception as e:
+                    logger.warning(f"Error processing PDF page {page_num+1}: {e}")
+                
+                # Remove temporary image file
+                try:
+                    os.remove(temp_img_path)
+                except:
+                    pass
+            
+            # Close the PDF
+            pdf_document.close()
+            
+            # Combine text from all pages
+            text = "\n".join(full_text)
+            logger.info(f"GOT-OCR extraction complete for PDF, yielded {len(text)} characters from {len(pdf_document)} pages")
+        else:
+            # Process a regular image file
+            logger.info(f"Processing image file with GOT-OCR: {file_path}")
+            # Use the chat method as documented in the model page
+            text = model.chat(tokenizer, file_path, ocr_type='ocr')
+            logger.info(f"GOT-OCR extraction complete, yielded {len(text) if text else 0} characters")
+        
         return text
     except Exception as e:
         logger.error(f"Error during advanced OCR: {e}")
