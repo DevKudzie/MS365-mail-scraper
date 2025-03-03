@@ -12,7 +12,7 @@ from datetime import datetime
 import argparse
 import time
 import traceback
-from transformers import AutoModelForVision2Seq, AutoProcessor
+from transformers import AutoModel, AutoProcessor, AutoTokenizer
 import torch
 from dotenv import load_dotenv
 import logging
@@ -204,8 +204,17 @@ def extract_text_with_got_ocr(file_path):
         logger.info(f"Using device: {device} for GOT-OCR")
         
         logger.info("Loading GOT-OCR model (this may take some time on first run)")
-        model = AutoModelForVision2Seq.from_pretrained("stepfun-ai/GOT-OCR-2.0-hf").to(device)
-        processor = AutoProcessor.from_pretrained("stepfun-ai/GOT-OCR-2.0-hf")
+        # Use the correct model ID and parameters
+        model = AutoModel.from_pretrained(
+            "stepfun-ai/GOT-OCR2_0", 
+            trust_remote_code=True,
+            low_cpu_mem_usage=True
+        ).to(device)
+        
+        processor = AutoProcessor.from_pretrained(
+            "stepfun-ai/GOT-OCR2_0",
+            trust_remote_code=True
+        )
         
         # Load and process the image
         logger.info("Processing image with GOT-OCR")
