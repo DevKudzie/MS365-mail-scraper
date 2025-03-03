@@ -367,7 +367,7 @@ def fetch_attachments(email_id, headers):
         print(f"Network error while fetching attachments: {e}")
         return []
 
-def process_emails(start_date, end_date, output_file="email_data.xlsx", batch_size=200, category_filter=None, limit=1000):
+def process_emails(start_date, end_date, output_file="email_data.xlsx", batch_size=200, category_filter=None, limit=10000):
     """
     Process emails within a specified date range and save to Excel.
     
@@ -519,7 +519,7 @@ def main():
     parser.add_argument('--category', help='Optional category filter')
     parser.add_argument('--output', default='email_data.xlsx', help='Output Excel file name')
     parser.add_argument('--batch-size', type=int, default=200, help='Number of emails to process before saving progress')
-    parser.add_argument('--limit', type=int, default=1000, help='Maximum number of emails to retrieve')
+    parser.add_argument('--limit', type=int, default=10000, help='Maximum number of emails to retrieve')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     
     args = parser.parse_args()
