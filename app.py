@@ -228,10 +228,11 @@ def extract_text_with_got_ocr(file_path):
             
             # Open the PDF
             pdf_document = fitz.open(file_path)
+            total_pages = len(pdf_document)  # Store page count before closing
             
             # Process each page
-            for page_num in range(len(pdf_document)):
-                logger.info(f"Processing page {page_num+1}/{len(pdf_document)} of PDF")
+            for page_num in range(total_pages):
+                logger.info(f"Processing page {page_num+1}/{total_pages} of PDF")
                 page = pdf_document.load_page(page_num)
                 
                 # Convert page to an image
@@ -262,7 +263,7 @@ def extract_text_with_got_ocr(file_path):
             
             # Combine text from all pages
             text = "\n".join(full_text)
-            logger.info(f"GOT-OCR extraction complete for PDF, yielded {len(text)} characters from {len(pdf_document)} pages")
+            logger.info(f"GOT-OCR extraction complete for PDF, yielded {len(text)} characters from {total_pages} pages")
         else:
             # Process a regular image file
             logger.info(f"Processing image file with GOT-OCR: {file_path}")
