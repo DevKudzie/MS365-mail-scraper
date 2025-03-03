@@ -69,7 +69,7 @@ def create_requests_session(retries=3, backoff_factor=0.5, status_forcelist=(500
     return session
 
 # Function to authenticate and fetch emails
-def access_emails_with_delegated_permissions(start_date, end_date, category_filter=None, limit=1000):
+def access_emails_with_delegated_permissions(start_date, end_date, category_filter=None, limit=10000):
     """
     Authenticate with Microsoft Graph API and fetch emails within a date range.
     
