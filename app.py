@@ -210,13 +210,30 @@ def extract_text_with_got_ocr(file_path):
             trust_remote_code=True,
         )
         
+        # Set pad_token to a different value than eos_token to avoid warnings
+        if tokenizer.pad_token is None:
+            if hasattr(tokenizer, 'eos_token') and tokenizer.eos_token:
+                # Add a new token as pad_token instead of reusing eos_token
+                tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+                logger.info("Set custom pad token for tokenizer")
+        
         model = AutoModel.from_pretrained(
             "stepfun-ai/GOT-OCR2_0", 
             trust_remote_code=True,
             low_cpu_mem_usage=True,
             device_map=device,
-            pad_token_id=tokenizer.eos_token_id
+            pad_token_id=tokenizer.pad_token_id
         )
+        
+        # Update model configuration with the pad token ID
+        if hasattr(model, 'config') and hasattr(tokenizer, 'pad_token_id'):
+            model.config.pad_token_id = tokenizer.pad_token_id
+            logger.info("Updated model configuration with pad token ID")
+        
+        # Silence the specific deprecation warnings by filtering them
+        import warnings
+        warnings.filterwarnings("ignore", message="The `seen_tokens` attribute is deprecated")
+        warnings.filterwarnings("ignore", message="`get_max_cache\\(\\)` is deprecated")
         
         # Check if the file is a PDF or an image
         file_extension = os.path.splitext(file_path)[1].lower()
@@ -245,7 +262,17 @@ def extract_text_with_got_ocr(file_path):
                 # Process the image with GOT-OCR
                 try:
                     # Process the image with GOT-OCR using the chat method as per documentation
-                    page_text = model.chat(tokenizer, temp_img_path, ocr_type='ocr')
+                    # Set attention_mask parameter if the model's chat method supports it
+                    try:
+                        page_text = model.chat(
+                            tokenizer, 
+                            temp_img_path, 
+                            ocr_type='ocr',
+                        )
+                    except TypeError:
+                        # If chat doesn't accept attention_mask parameter, use original call
+                        page_text = model.chat(tokenizer, temp_img_path, ocr_type='ocr')
+                        
                     if page_text:
                         full_text.append(page_text)
                     logger.info(f"Extracted {len(page_text) if page_text else 0} characters from page {page_num+1}")
@@ -268,7 +295,12 @@ def extract_text_with_got_ocr(file_path):
             # Process a regular image file
             logger.info(f"Processing image file with GOT-OCR: {file_path}")
             # Use the chat method as documented in the model page
-            text = model.chat(tokenizer, file_path, ocr_type='ocr')
+            try:
+                text = model.chat(tokenizer, file_path, ocr_type='ocr')
+            except TypeError:
+                # If chat doesn't accept attention_mask parameter, use original call
+                text = model.chat(tokenizer, file_path, ocr_type='ocr')
+                
             logger.info(f"GOT-OCR extraction complete, yielded {len(text) if text else 0} characters")
         
         return text
